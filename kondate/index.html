@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>献立ノート - 食費と献立の記録</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap');
+:root{
+  --paper:#F2EFE4; --card:#FBFAF5; --ink:#2E2B22; --ink-sub:#7A755F; --line:#DAD3BE;
+  --stamp:#B5451F; --safe:#3F7D53; --safe-bg:#E6F0E7; --warn:#C98A2C; --warn-bg:#F7EDDA;
+  --danger:#B23B3B; --danger-bg:#F6E4E1; --input:#FFF8E6;
+  --c-asa:#E0A458; --c-hiru:#7FA86B; --c-ban:#4F7CA8;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:'Zen Kaku Gothic New',sans-serif;padding:20px 14px 90px;font-size:15px;}
+.wrap{max-width:960px;margin:0 auto;}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
+header h1{margin:0;font-size:24px;letter-spacing:.05em;}
+header h1 small{font-size:12px;color:var(--ink-sub);font-weight:500;margin-left:8px;}
+#sync-status{font-size:12px;color:var(--ink-sub);}
+#sync-status.err{color:var(--danger);font-weight:700;}
+nav.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px;position:sticky;top:0;background:var(--paper);z-index:5;padding-top:6px;}
+nav.tabs button{flex:0 0 auto;border:1.5px solid var(--ink);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 14px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;}
+nav.tabs button.on{background:var(--ink);color:var(--paper);}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;}
+.card h2{font-size:16px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+.sub{color:var(--ink-sub);font-size:12px;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+label.lb{font-weight:700;font-size:13px;min-width:64px;}
+input,select{font:inherit;font-size:15px;border:1px solid var(--line);border-radius:6px;padding:7px 8px;background:var(--input);color:var(--ink);min-width:0;}
+input:focus,select:focus{outline:2px solid var(--warn);}
+input[type=number]{text-align:right;}
+button{font:inherit;cursor:pointer;}
+.btn{border:none;background:var(--ink);color:var(--paper);border-radius:8px;padding:9px 16px;font-weight:700;}
+.btn.sub{background:var(--card);color:var(--ink);border:1.5px solid var(--ink);}
+.btn.danger{background:var(--danger);}
+.btn.small{padding:5px 10px;font-size:13px;}
+.btn:disabled{opacity:.4;cursor:default;}
+.x{border:none;background:none;color:var(--ink-sub);font-size:16px;padding:2px 6px;}
+.x:hover{color:var(--danger);}
+.chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-weight:700;font-size:14px;}
+.chip.on{background:var(--stamp);border-color:var(--stamp);color:#fff;}
+table{border-collapse:collapse;width:100%;}
+th,td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;}
+th{font-size:12px;color:var(--ink-sub);font-weight:700;}
+td.num,th.num{text-align:right;font-family:'JetBrains Mono',monospace;}
+.mono{font-family:'JetBrains Mono',monospace;}
+.ing-rows .ing{display:grid;grid-template-columns:1fr 90px 52px 64px 28px;gap:6px;align-items:center;margin-bottom:6px;}
+.ing-rows .ing select,.ing-rows .ing input{width:100%;}
+.ing .unit{font-size:13px;color:var(--ink-sub);}
+.ing .cost{text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;}
+.buy-rows .bro{display:grid;grid-template-columns:1fr 80px 60px 84px 28px;gap:6px;align-items:center;margin-bottom:2px;}
+.buy-rows .bro input{width:100%;}
+.buy-rows .hint{font-size:11px;margin:0 0 6px 2px;min-height:14px;}
+.hint.new{color:#1F4E79;font-weight:700;}
+.hint.alias{color:var(--ink-sub);}
+.total{font-weight:700;text-align:right;font-size:16px;margin:8px 0;}
+.total .mono{font-size:18px;}
+.badge{display:inline-block;border-radius:4px;padding:1px 6px;font-size:12px;font-weight:700;}
+.b-ok{background:var(--safe-bg);color:var(--safe);}
+.b-chg{background:var(--warn-bg);color:#8A5A12;}
+.b-none{background:#EEE;color:#888;}
+.b-over{color:var(--danger);font-weight:700;}
+.unknown{background:#F8CBAD !important;color:#843C0C;font-weight:700;}
+.day{border:1px solid var(--line);border-radius:10px;background:var(--card);margin-bottom:12px;overflow:hidden;}
+.day-h{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#ECE7D6;font-weight:700;}
+.day-h .hol{color:var(--danger);}
+.day-h label{font-size:12px;font-weight:500;display:flex;align-items:center;gap:4px;}
+.slot{display:grid;grid-template-columns:62px 1fr;gap:6px 10px;padding:8px 12px;border-top:1px dashed var(--line);}
+.slot .sl{font-weight:700;font-size:14px;padding-top:7px;}
+.slot .dishes{display:grid;grid-template-columns:1fr 1fr 1fr 78px;gap:6px;}
+.slot .dishes input{width:100%;font-size:14px;}
+.slot .res{grid-column:2;font-size:13px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--ink-sub);}
+.slot .res b{color:var(--ink);font-family:'JetBrains Mono',monospace;}
+.weeknav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.sum3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;}
+.sum3 div{background:var(--paper);border-radius:8px;padding:8px;text-align:center;}
+.sum3 .v{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;}
+.sum3 .k{font-size:11px;color:var(--ink-sub);}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;margin-top:6px;}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:-1px;}
+.shop li{list-style:none;display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line);}
+.shop{padding:0;margin:0;}
+.shop li.done .nm{text-decoration:line-through;color:var(--ink-sub);}
+.shop .nm{font-weight:700;font-size:16px;}
+.shop .det{font-size:12px;color:var(--ink-sub);}
+.shop .q{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:16px;text-align:right;}
+.shop input[type=checkbox]{width:22px;height:22px;}
+.warnbox{background:var(--warn-bg);border:1px solid #E8C990;border-radius:8px;padding:10px;font-size:14px;}
+.warnbox .btn{margin:4px 4px 0 0;}
+.rec-group{margin-bottom:10px;}
+.rec-group .gh{font-weight:700;font-size:14px;display:flex;justify-content:space-between;border-bottom:1.5px solid var(--ink);padding:3px 0;}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:14px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:90vw;text-align:center;}
+#toast.show{opacity:1;}
+#toast.err{background:var(--danger);}
+.empty{color:var(--ink-sub);font-size:14px;padding:10px 0;}
+.pie-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+details summary{cursor:pointer;font-weight:700;}
+a{color:var(--stamp);}
+@media (max-width:640px){
+  body{padding:12px 10px 90px;}
+  .slot{grid-template-columns:1fr;}
+  .slot .res{grid-column:1;}
+  .slot .dishes{grid-template-columns:1fr 1fr;}
+  .ing-rows .ing{grid-template-columns:1fr 70px 40px 54px 24px;}
+  .buy-rows .bro{grid-template-columns:1fr 62px 46px 70px 24px;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>献立ノート<small>食費と献立の記録</small></h1>
+    <div id="sync-status">読み込み中…</div>
+  </header>
+  <nav class="tabs" id="tabs"></nav>
+  <main id="main"></main>
+</div>
+<div id="toast"></div>
+<datalist id="dl-dish"></datalist>
+<datalist id="dl-ing"></datalist>
+
+<script>
+'use strict';
+// ====================================================================
+// 基本設定
+// ====================================================================
+const TABLES = ['purchases','cooks','recipes','plans','holidays','aliases'];
+const LS_URL = 'kondate-sheet-url', LS_DATA = 'kondate-data', LS_WEEK = 'kondate-week-start', LS_CHECK = 'kondate-shop-check';
+const SLOT_ORDER = ['朝','てつ朝','ぬん朝','昼','てつ昼','ぬん昼','晩'];
+const SLOT_COLOR = {'朝':'#E0A458','てつ朝':'#C98A2C','ぬん朝':'#F2C98A','昼':'#7FA86B','てつ昼':'#5E8A4C','ぬん昼':'#A9CB98','晩':'#4F7CA8'};
+const GROUP_COLOR = {'朝':'#E0A458','昼':'#7FA86B','晩':'#4F7CA8'};
+const WD = ['日','月','火','水','木','金','土'];
+const TAB_DEFS = [
+  ['cook','料理を記録'],['buy','買い物'],['week','週間献立'],['shop','買い物リスト'],['graph','グラフ'],['recipe','レシピ'],['settings','設定']
+];
+
+let state = {purchases:[],cooks:[],recipes:[],plans:[],holidays:[],aliases:[]};
+let sheetUrl = '';
+let tab = 'cook';
+let C = null; // 計算結果のキャッシュ
+
+// ====================================================================
+// ユーティリティ
+// ====================================================================
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g,'')); return isFinite(n) ? n : null; };
+const yen = v => v == null ? '-' : Math.round(v).toLocaleString('ja-JP');
+const qfmt = v => v == null ? '' : (Math.round(v*100)/100).toLocaleString('ja-JP', {maximumFractionDigits:2});
+const pad = n => String(n).padStart(2,'0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseD = s => { const [y,m,d] = String(s).split('-').map(Number); return new Date(y, m-1, d); };
+const addDays = (s, n) => { const d = parseD(s); d.setDate(d.getDate()+n); return ymd(d); };
+const md = s => { const d = parseD(s); return `${d.getMonth()+1}/${d.getDate()}`; };
+const wd = s => WD[parseD(s).getDay()];
+const today = () => ymd(new Date());
+const clean = s => String(s ?? '').replace(/　/g,' ').trim();
+function toast(msg, err){
+  const t = $('#toast'); t.textContent = msg; t.className = err ? 'err show' : 'show';
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.className = '', err ? 4000 : 2000);
+}
+function setSync(msg, err){ const el = $('#sync-status'); el.textContent = msg; el.className = err ? 'err' : ''; }
+
+// ====================================================================
+// 保存（スプレッドシート or この端末）
+// ====================================================================
+function saveLocal(){ try{ localStorage.setItem(LS_DATA, JSON.stringify(state)); }catch(e){} }
+async function loadAll(silent){
+  if(sheetUrl){
+    try{
+      if(!silent) setSync('スプレッドシートから読み込み中…');
+      const res = await fetch(`${sheetUrl}?action=all`);
+      const j = await res.json();
+      if(!j.ok) throw new Error(j.error || '読み込み失敗');
+      TABLES.forEach(t => state[t] = j[t] || []);
+      setSync('スプレッドシート連携中');
+    }catch(e){
+      console.error(e);
+      setSync('スプレッドシートの読み込みに失敗しました。URLや通信を確認してください', true);
+    }
+  }else{
+    try{ const raw = localStorage.getItem(LS_DATA); if(raw){ const d = JSON.parse(raw); TABLES.forEach(t => state[t] = d[t] || []); } }catch(e){}
+    setSync('この端末だけに保存中（設定からスプレッドシートと連携できます）');
+  }
+  recompute();
+}
+async function post(body){
+  if(!sheetUrl){ saveLocal(); return true; }
+  try{
+    const res = await fetch(sheetUrl, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body)});
+    const j = await res.json();
+    if(!j.ok) throw new Error(j.error || '保存失敗');
+    setSync('スプレッドシート連携中');
+    return true;
+  }catch(e){
+    console.error(e);
+    setSync('スプレッドシートへの保存に失敗しました。画面を開き直して確認してください', true);
+    toast('保存に失敗しました', true);
+    return false;
+  }
+}
+function dbUpsert(table, rows){
+  rows.forEach(r => {
+    const i = state[table].findIndex(x => String(x.id) === String(r.id));
+    if(i >= 0) state[table][i] = {...state[table][i], ...r}; else state[table].push(r);
+  });
+  recompute();
+  return post({action:'upsert', table, rows});
+}
+function dbDelete(table, ids){
+  const set = new Set(ids.map(String));
+  state[table] = state[table].filter(x => !set.has(String(x.id)));
+  recompute();
+  return post({action:'delete', table, ids});
+}
+function dbReplaceDish(dish, rows){
+  state.recipes = state.recipes.filter(r => r.dish !== dish).concat(rows);
+  recompute();
+  return post({action:'replaceDish', dish, rows});
+}
+
+// ====================================================================
+// 計算（エクセル版と同じ考え方）
+// ====================================================================
+function recompute(){
+  const alias = new Map(state.aliases.map(a => [clean(a.alias), clean(a.name)]));
+  const norm = n => { const c = clean(n); return alias.get(c) || c; };
+  // 食材ごと：同じ食材の量と金額をプール → 平均単価
+  const ing = new Map();
+  for(const p of state.purchases){
+    const n = norm(p.name); if(!n) continue;
+    let e = ing.get(n);
+    if(!e){ e = {name:n, unit:clean(p.unit), buyQty:0, buyPrice:0, count:0, used:0, usedCost:0}; ing.set(n, e); }
+    e.buyQty += num(p.qty) || 0; e.buyPrice += num(p.price) || 0; e.count++;
+    if(!e.unit && p.unit) e.unit = clean(p.unit);
+  }
+  for(const e of ing.values()) e.price = e.buyQty > 0 ? e.buyPrice / e.buyQty : null;
+  const priceOf = n => { const e = ing.get(n); return e ? e.price : null; };
+  // 料理記録 → 費用、1回ごとの料理（日付・区分・料理名）
+  const inst = new Map();
+  const cooks = state.cooks.map(c => {
+    const n = norm(c.ingredient), q = num(c.qty), pr = priceOf(n);
+    const cost = (q != null && pr != null) ? q * pr : null;
+    const e = ing.get(n); if(e && q != null){ e.used += q; e.usedCost += cost || 0; }
+    return {...c, ingredient:n, q, cost};
+  });
+  cooks.forEach((c, idx) => {
+    const k = `${c.date}|${c.slot}|${c.dish}`;
+    let x = inst.get(k);
+    if(!x){ x = {date:c.date, slot:c.slot, dish:c.dish, cost:0, ings:new Map(), order:idx}; inst.set(k, x); }
+    x.cost += c.cost || 0;
+    x.ings.set(c.ingredient, (x.ings.get(c.ingredient) || 0) + (c.q || 0));
+  });
+  for(const e of ing.values()) e.remain = e.buyQty - e.used;
+  // 料理ごとの統計
+  const dish = new Map();
+  for(const x of inst.values()){
+    let d = dish.get(x.dish);
+    if(!d){ d = {name:x.dish, count:0, total:0, last:'', ingTotal:new Map(), lastInst:null}; dish.set(x.dish, d); }
+    d.count++; d.total += x.cost;
+    if(x.date >= d.last){ d.last = x.date; d.lastInst = x; }
+    for(const [n, q] of x.ings) d.ingTotal.set(n, (d.ingTotal.get(n) || 0) + q);
+  }
+  for(const d of dish.values()){ d.avg = d.total / d.count; d.ingAvg = new Map([...d.ingTotal].map(([n,q]) => [n, q / d.count])); }
+  // レシピ
+  const recipe = new Map();
+  for(const r of state.recipes){
+    const dn = clean(r.dish); if(!dn) continue;
+    if(!recipe.has(dn)) recipe.set(dn, []);
+    recipe.get(dn).push({ingredient:norm(r.ingredient), qty:num(r.qty), unit:clean(r.unit)});
+  }
+  const unitOf = n => { const e = ing.get(n); if(e && e.unit) return e.unit; for(const rows of recipe.values()) for(const r of rows) if(r.ingredient === n && r.unit) return r.unit; return ''; };
+  const recipeCost = dn => (recipe.get(dn) || []).reduce((s, r) => { const p = priceOf(r.ingredient); return s + (p != null && r.qty != null ? r.qty * p : 0); }, 0);
+  const estimate = dn => { dn = clean(dn); if(!dn) return null; if(recipe.has(dn)) return recipeCost(dn); const d = dish.get(dn); return d ? d.avg : null; };
+  const known = dn => { dn = clean(dn); return !!dn && (recipe.has(dn) || dish.has(dn)); };
+  const holi = new Set(state.holidays.map(h => String(h.date || h.id)));
+  const isHoliday = s => { const w = parseD(s).getDay(); return w === 0 || w === 6 || holi.has(s); };
+  const slotsFor = s => isHoliday(s) ? ['朝','昼','晩'] : ['てつ朝','ぬん朝','てつ昼','ぬん昼','晩'];
+  const planOf = (s, slot) => state.plans.find(p => p.id === `${s}|${slot}`) || null;
+  const actual = (s, slot) => {
+    const xs = [...inst.values()].filter(x => x.date === s && x.slot === slot).sort((a,b) => a.order - b.order);
+    return {dishes: xs.map(x => x.dish), cost: xs.reduce((t, x) => t + x.cost, 0), has: xs.length > 0};
+  };
+  const planEstimate = p => {
+    if(!p) return null;
+    const b = num(p.budget); if(b != null) return b;
+    const ds = [p.dish1, p.dish2, p.dish3].map(clean).filter(Boolean);
+    if(!ds.some(known)) return null;
+    return ds.reduce((t, d) => t + (estimate(d) || 0), 0);
+  };
+  const group = slot => slot.includes('朝') ? '朝' : slot.includes('昼') ? '昼' : '晩';
+  C = {norm, ing, priceOf, cooks, inst, dish, recipe, unitOf, recipeCost, estimate, known, isHoliday, slotsFor, planOf, actual, planEstimate, group};
+  // 入力候補
+  const ingNames = [...new Set([...ing.keys(), ...[...recipe.values()].flat().map(r => r.ingredient)])].sort((a,b) => a.localeCompare(b,'ja'));
+  $('#dl-ing').innerHTML = ingNames.map(n => `<option value="${esc(n)}">`).join('');
+  const dishNames = [...new Set([...dish.keys(), ...recipe.keys(), ...state.plans.flatMap(p => [p.dish1,p.dish2,p.dish3]).map(clean).filter(Boolean)])].sort((a,b) => a.localeCompare(b,'ja'));
+  $('#dl-dish').innerHTML = dishNames.map(n => `<option value="${esc(n)}">`).join('');
+}
+
+function weekData(start){
+  const days = [...Array(7)].map((_, i) => addDays(start, i));
+  const out = {days:[], planTotal:0, actualTotal:0, diffTotal:0};
+  for(const s of days){
+    const slots = C.slotsFor(s).map(slot => {
+      const p = C.planOf(s, slot), est = C.planEstimate(p), act = C.actual(s, slot);
+      const d1 = clean(p && p.dish1);
+      const judge = !d1 ? '' : !act.has ? '未記録' : act.dishes.some(x => x.includes(d1)) ? '○' : '変更';
+      let diff = (est != null && act.cost > 0) ? act.cost - est : null; if(diff != null && Math.abs(diff) < 0.5) diff = 0;
+      return {slot, plan:p, est, act, judge, diff};
+    });
+    const g = {'朝':0,'昼':0,'晩':0};
+    for(const c of C.cooks) if(c.date === s) g[C.group(c.slot)] += c.cost || 0;
+    const planDay = slots.reduce((t, x) => t + (x.est || 0), 0);
+    out.days.push({date:s, slots, g, planDay});
+    slots.forEach(x => { out.planTotal += x.est || 0; out.actualTotal += x.act.cost; out.diffTotal += x.diff || 0; });
+  }
+  return out;
+}
+
+function shoppingList(start){
+  const need = new Map(), unknown = [], seen = new Set();
+  const add = (n, q) => need.set(n, (need.get(n) || 0) + q);
+  for(let i = 0; i < 7; i++){
+    const s = addDays(start, i);
+    for(const slot of C.slotsFor(s)){
+      const p = C.planOf(s, slot); if(!p) continue;
+      if(C.actual(s, slot).has) continue; // もう作った枠は数えない
+      for(const raw of [p.dish1, p.dish2, p.dish3]){
+        const dn = clean(raw); if(!dn) continue;
+        if(C.recipe.has(dn)){ for(const r of C.recipe.get(dn)) if(r.qty != null) add(r.ingredient, r.qty); }
+        else if(C.dish.has(dn)){ for(const [n, q] of C.dish.get(dn).ingAvg) add(n, q); }
+        else if(!seen.has(dn)){ seen.add(dn); unknown.push(dn); }
+      }
+    }
+  }
+  const items = [];
+  for(const [n, q] of need){
+    const e = C.ing.get(n), remain = Math.max(0, e ? e.remain : 0), buy = q - remain;
+    if(buy > 1e-4) items.push({name:n, unit:C.unitOf(n), need:q, remain, buy, cost: e && e.price != null ? buy * e.price : null});
+  }
+  return {items, unknown};
+}
+
+// ====================================================================
+// 画面：共通
+// ====================================================================
+function renderTabs(){
+  $('#tabs').innerHTML = TAB_DEFS.map(([k, l]) => `<button data-tab="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('');
+}
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if(!b) return; go(b.dataset.tab); });
+function go(t, opt){ tab = t; renderTabs(); render(opt); window.scrollTo(0, 0); }
+function render(opt){
+  const m = $('#main');
+  ({cook:renderCook, buy:renderBuy, week:renderWeek, shop:renderShop, graph:renderGraph, recipe:renderRecipe, settings:renderSettings})[tab](m, opt || {});
+}
+function ingSelect(val, missing){
+  const names = [...C.ing.keys()].sort((a,b) => a.localeCompare(b,'ja'));
+  return `<select class="f-ing" data-missing="${esc(missing || '')}"><option value="">${missing ? `未購入：${esc(missing)}` : '（食材を選ぶ）'}</option>${names.map(n => `<option ${n === val ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+}
+function getWeekStart(){
+  let s = localStorage.getItem(LS_WEEK);
+  if(!s){ const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); s = ymd(d); }
+  return s;
+}
+function setWeekStart(s){ try{ localStorage.setItem(LS_WEEK, s); }catch(e){} }
+
+// ====================================================================
+// 料理を記録
+// ====================================================================
+const cookForm = {date:null, slot:null};
+function renderCook(m){
+  if(!cookForm.date) cookForm.date = today();
+  const slots = C.slotsFor(cookForm.date);
+  if(!slots.includes(cookForm.slot)) cookForm.slot = slots[0];
+  m.innerHTML = `
+  <div class="card">
+    <h2>料理を記録</h2>
+    <div class="row"><label class="lb">日付</label><input type="date" id="c-date" value="${cookForm.date}"><span class="sub">（${wd(cookForm.date)}）${C.isHoliday(cookForm.date) ? '休日の区分' : '平日の区分'}</span></div>
+    <div class="row"><label class="lb">食事区分</label><div class="chips" id="c-slots">${slots.map(s => `<button class="chip ${s === cookForm.slot ? 'on' : ''}" data-slot="${s}">${s}</button>`).join('')}</div></div>
+    <div class="row"><label class="lb">料理名</label><input id="c-dish" list="dl-dish" placeholder="例：親子丼" style="flex:1;min-width:150px"><button class="btn sub small" id="c-load" style="display:none">前回の材料を読み込む</button></div>
+    <div class="sub" style="margin:-4px 0 8px">食材は「買い物」に入れたものから選びます（表記ゆれ防止）</div>
+    <div class="ing-rows" id="c-rows"></div>
+    <div class="row"><button class="btn sub small" id="c-add">＋ 食材を追加</button></div>
+    <div class="total">合計 <span class="mono" id="c-total">0</span> 円</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="c-save">記録する</button></div>
+  </div>
+  <div class="card"><h2>${md(cookForm.date)}（${wd(cookForm.date)}）の記録</h2><div id="c-list"></div></div>`;
+  const rows = $('#c-rows');
+  const addRow = (n = '', q = '', missing = '') => {
+    const d = document.createElement('div'); d.className = 'ing';
+    d.innerHTML = `${ingSelect(n, missing)}<input type="number" step="any" inputmode="decimal" class="f-q" placeholder="量" value="${q}"><span class="unit"></span><span class="cost"></span><button class="x" title="この行を消す">✕</button>`;
+    rows.appendChild(d); updRow(d);
+  };
+  const calcTotal = () => {
+    let t = 0; rows.querySelectorAll('.ing').forEach(r => { const qq = num($('.f-q', r).value), pp = C.priceOf($('.f-ing', r).value); if(qq != null && pp != null) t += qq * pp; });
+    $('#c-total').textContent = yen(t);
+  };
+  const updRow = d => {
+    const n = $('.f-ing', d).value, q = num($('.f-q', d).value), p = C.priceOf(n);
+    $('.unit', d).textContent = n ? C.unitOf(n) : '';
+    $('.cost', d).textContent = (q != null && p != null) ? yen(q * p) : '';
+    calcTotal();
+  };
+  for(let i = 0; i < 3; i++) addRow();
+  rows.addEventListener('input', e => { const d = e.target.closest('.ing'); if(d) updRow(d); });
+  rows.addEventListener('change', e => { const d = e.target.closest('.ing'); if(d) updRow(d); });
+  rows.addEventListener('click', e => { if(e.target.classList.contains('x')){ e.target.closest('.ing').remove(); if(!rows.querySelector('.ing')) addRow(); calcTotal(); } });
+  $('#c-add').onclick = () => addRow();
+  $('#c-date').onchange = e => { cookForm.date = e.target.value || today(); renderCook(m); };
+  $('#c-slots').onclick = e => { const b = e.target.closest('[data-slot]'); if(!b) return; cookForm.slot = b.dataset.slot; $('#c-slots').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); };
+  const dishInput = $('#c-dish'), loadBtn = $('#c-load');
+  dishInput.oninput = () => { const dn = clean(dishInput.value); loadBtn.style.display = (C.recipe.has(dn) || C.dish.has(dn)) ? '' : 'none'; loadBtn.textContent = C.recipe.has(dn) ? 'レシピの材料を読み込む' : '前回の材料を読み込む'; };
+  loadBtn.onclick = () => {
+    const dn = clean(dishInput.value);
+    const src = C.recipe.has(dn) ? C.recipe.get(dn).map(r => [r.ingredient, r.qty]) : [...C.dish.get(dn).lastInst.ings];
+    rows.innerHTML = ''; src.forEach(([n, q]) => C.ing.has(n) ? addRow(n, q ?? '') : addRow('', q ?? '', n));
+    const miss = src.filter(([n]) => !C.ing.has(n)).map(([n]) => n);
+    if(miss.length) toast(`まだ買ったことがない食材：${miss.join('・')}（先に買い物に入れてね）`, true);
+  };
+  $('#c-save').onclick = async () => {
+    const dn = clean(dishInput.value);
+    if(!dn) return toast('料理名を入れてください', true);
+    const recs = [], errs = [];
+    rows.querySelectorAll('.ing').forEach((r, i) => {
+      const n = $('.f-ing', r).value, qs = $('.f-q', r).value, q = num(qs);
+      if(!n && qs === '') return;
+      const ms = $('.f-ing', r).dataset.missing;
+      if(!n) errs.push(ms ? `${ms}（まだ買い物に入っていない。使わないなら✕で消す）` : `${i+1}行目の食材`); else if(q == null) errs.push(`${n}の量`);
+      else recs.push({id:uid('c'), date:cookForm.date, slot:cookForm.slot, dish:dn, ingredient:n, qty:q});
+    });
+    if(errs.length) return toast('入力を確認：' + errs.join('、'), true);
+    if(!recs.length) return toast('食材を1つ以上入れてください', true);
+    $('#c-save').disabled = true;
+    const ok = await dbUpsert('cooks', recs);
+    if(ok) toast(`${md(cookForm.date)} ${cookForm.slot}「${dn}」を記録しました`);
+    renderCook(m);
+  };
+  renderCookList();
+}
+function renderCookList(){
+  const el = $('#c-list'); if(!el) return;
+  const day = C.cooks.filter(c => c.date === cookForm.date);
+  if(!day.length){ el.innerHTML = '<div class="empty">まだ記録がありません</div>'; return; }
+  const slots = [...new Set(day.map(c => c.slot))].sort((a,b) => SLOT_ORDER.indexOf(a) - SLOT_ORDER.indexOf(b));
+  let total = 0;
+  el.innerHTML = slots.map(slot => {
+    const rs = day.filter(c => c.slot === slot), st = rs.reduce((t, c) => t + (c.cost || 0), 0); total += st;
+    return `<div class="rec-group"><div class="gh"><span>${slot}</span><span class="mono">${yen(st)} 円</span></div>
+      <table>${rs.map(c => `<tr><td>${esc(c.dish)}</td><td>${esc(c.ingredient)}</td><td class="num">${qfmt(c.q)} ${esc(C.unitOf(c.ingredient))}</td><td class="num">${c.cost == null ? '<span class="b-over">単価不明</span>' : yen(c.cost)}</td><td style="width:30px"><button class="x" data-del="${esc(c.id)}">✕</button></td></tr>`).join('')}</table></div>`;
+  }).join('') + `<div class="total">この日の合計 <span class="mono">${yen(total)}</span> 円</div>`;
+  el.onclick = async e => { const b = e.target.closest('[data-del]'); if(!b) return; if(!confirm('この行を削除しますか？')) return; await dbDelete('cooks', [b.dataset.del]); renderCookList(); };
+}
+
+// ====================================================================
+// 買い物
+// ====================================================================
+const buyForm = {date:null};
+function renderBuy(m){
+  if(!buyForm.date) buyForm.date = today();
+  m.innerHTML = `
+  <div class="card">
+    <h2>買い物を入力</h2>
+    <div class="row"><label class="lb">購入日</label><input type="date" id="b-date" value="${buyForm.date}"></div>
+    <div class="sub" style="margin-bottom:6px">食材名・数量・単位・金額（円）。同じ食材は自動で合算して平均単価を出します</div>
+    <div class="buy-rows" id="b-rows"></div>
+    <div class="row"><button class="btn sub small" id="b-add">＋ 行を追加</button></div>
+    <div class="total">合計 <span class="mono" id="b-total">0</span> 円</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="b-save">保存する</button></div>
+  </div>
+  <div class="card"><h2>最近の買い物</h2><div id="b-list"></div></div>
+  <div class="card"><details><summary>食材まとめ（平均単価・残りの目安）</summary><div id="b-sum" style="margin-top:8px"></div></details></div>`;
+  const rows = $('#b-rows');
+  const addRow = () => {
+    const d = document.createElement('div');
+    d.innerHTML = `<div class="bro"><input class="f-n" list="dl-ing" placeholder="食材名"><input type="number" step="any" inputmode="decimal" class="f-q" placeholder="数量"><input class="f-u" placeholder="単位"><input type="number" step="any" inputmode="numeric" class="f-p" placeholder="金額"><button class="x">✕</button></div><div class="hint"></div>`;
+    rows.appendChild(d);
+  };
+  const upd = d => {
+    const raw = clean($('.f-n', d).value), n = C.norm(raw), h = $('.hint', d), u = $('.f-u', d);
+    if(!raw){ h.textContent = ''; h.className = 'hint'; }
+    else if(n !== raw){ h.textContent = `→「${n}」として集計`; h.className = 'hint alias'; }
+    else if(!C.ing.has(n)){ h.textContent = '★ 初めての食材（打ち間違いでないか確認）'; h.className = 'hint new'; }
+    else { h.textContent = ''; h.className = 'hint'; }
+    if(raw && !u.value && C.unitOf(n)) u.value = C.unitOf(n);
+    let t = 0; rows.querySelectorAll('.f-p').forEach(p => t += num(p.value) || 0); $('#b-total').textContent = yen(t);
+  };
+  for(let i = 0; i < 4; i++) addRow();
+  rows.addEventListener('input', e => { const d = e.target.closest('.bro')?.parentElement; if(d && !e.target.classList.contains('f-u')) upd(d); });
+  rows.addEventListener('change', e => { const d = e.target.closest('.bro')?.parentElement; if(d && e.target.classList.contains('f-n')) upd(d); });
+  rows.addEventListener('click', e => { if(e.target.classList.contains('x')){ e.target.closest('.bro').parentElement.remove(); if(!rows.children.length) addRow(); } });
+  $('#b-add').onclick = addRow;
+  $('#b-date').onchange = e => buyForm.date = e.target.value || today();
+  $('#b-save').onclick = async () => {
+    const recs = [], errs = [];
+    [...rows.children].forEach((d, i) => {
+      const n = clean($('.f-n', d).value), q = num($('.f-q', d).value), u = clean($('.f-u', d).value), p = num($('.f-p', d).value);
+      if(!n && q == null && p == null) return;
+      if(!n || q == null || p == null || q <= 0) errs.push(`${i+1}行目`);
+      else recs.push({id:uid('p'), date:buyForm.date, name:n, qty:q, unit:u, price:p});
+    });
+    if(errs.length) return toast('食材名・数量・金額を確認：' + errs.join('、'), true);
+    if(!recs.length) return toast('入力がありません', true);
+    $('#b-save').disabled = true;
+    const ok = await dbUpsert('purchases', recs);
+    if(ok) toast(`${recs.length} 件を保存しました`);
+    renderBuy(m);
+  };
+  // 最近の買い物
+  const list = [...state.purchases].sort((a,b) => String(b.date).localeCompare(String(a.date))).slice(0, 40);
+  $('#b-list').innerHTML = list.length ? `<table><tr><th>日付</th><th>食材</th><th class="num">数量</th><th class="num">金額</th><th></th></tr>${list.map(p => `<tr><td>${md(p.date)}</td><td>${esc(p.name)}${C.norm(p.name) !== clean(p.name) ? ` <span class="sub">→${esc(C.norm(p.name))}</span>` : ''}</td><td class="num">${qfmt(num(p.qty))} ${esc(p.unit)}</td><td class="num">${yen(num(p.price))}</td><td style="width:30px"><button class="x" data-del="${esc(p.id)}">✕</button></td></tr>`).join('')}</table>` : '<div class="empty">まだ買い物の記録がありません</div>';
+  $('#b-list').onclick = async e => { const b = e.target.closest('[data-del]'); if(!b) return; if(!confirm('この買い物を削除しますか？')) return; await dbDelete('purchases', [b.dataset.del]); renderBuy(m); };
+  const ings = [...C.ing.values()].sort((a,b) => a.name.localeCompare(b.name,'ja'));
+  $('#b-sum').innerHTML = ings.length ? `<table><tr><th>食材</th><th class="num">回数</th><th class="num">買った量</th><th class="num">平均単価</th><th class="num">使った量</th><th class="num">残り(目安)</th></tr>${ings.map(e => `<tr><td>${esc(e.name)}</td><td class="num">${e.count}</td><td class="num">${qfmt(e.buyQty)} ${esc(e.unit)}</td><td class="num">${e.price == null ? '-' : (Math.round(e.price*100)/100).toLocaleString('ja-JP')}</td><td class="num">${qfmt(e.used)}</td><td class="num ${e.remain < 0 ? 'b-over' : ''}">${qfmt(e.remain)}</td></tr>`).join('')}</table>` : '<div class="empty">データなし</div>';
+}
+
+// ====================================================================
+// 週間献立（予定と実績）
+// ====================================================================
+function weekNav(start, id){
+  return `<div class="weeknav"><button class="btn sub small" data-wk="-7">◀ 前の週</button><input type="date" id="${id}" value="${start}"><span class="sub">〜 ${md(addDays(start, 6))}（${wd(addDays(start, 6))}）</span><button class="btn sub small" data-wk="7">次の週 ▶</button></div>`;
+}
+function bindWeekNav(m, id, rerender){
+  m.querySelectorAll('[data-wk]').forEach(b => b.onclick = () => { setWeekStart(addDays(getWeekStart(), +b.dataset.wk)); rerender(); });
+  $('#' + id).onchange = e => { if(e.target.value){ setWeekStart(e.target.value); rerender(); } };
+}
+function renderWeek(m){
+  const start = getWeekStart();
+  m.innerHTML = `
+  <div class="card"><h2>週間献立：予定と実績</h2>${weekNav(start, 'w-start')}
+    <div class="sum3" id="w-sum"></div>
+    <div id="w-chart"></div>
+    <div class="sub">オレンジの料理は材料がわからない料理（作った記録もレシピもない）→ 「レシピ」に登録すると買い物リストに入ります。予算を入れるとその金額を予定金額にします。</div>
+  </div>
+  <div id="w-days"></div>`;
+  bindWeekNav(m, 'w-start', () => renderWeek(m));
+  const days = [...Array(7)].map((_, i) => addDays(start, i));
+  $('#w-days').innerHTML = days.map(s => {
+    const hol = state.holidays.some(h => String(h.date || h.id) === s), w = parseD(s).getDay(), weekend = w === 0 || w === 6;
+    return `<div class="day"><div class="day-h"><span class="${C.isHoliday(s) ? 'hol' : ''}">${md(s)}（${wd(s)}）</span>${weekend ? '<span class="sub">休日</span>' : `<label><input type="checkbox" data-hol="${s}" ${hol ? 'checked' : ''}>祝日・休み</label>`}</div>
+      ${C.slotsFor(s).map(slot => { const p = C.planOf(s, slot) || {}; const key = `${s}|${slot}`;
+        return `<div class="slot" data-key="${esc(key)}"><div class="sl">${slot}</div><div class="dishes">
+          ${['dish1','dish2','dish3'].map((f, i) => `<input list="dl-dish" data-f="${f}" placeholder="予定の料理${'①②③'[i]}" value="${esc(p[f] || '')}">`).join('')}
+          <input type="number" step="any" inputmode="numeric" data-f="budget" placeholder="予算" value="${esc(p.budget ?? '')}"></div>
+          <div class="res" data-res="${esc(key)}"></div></div>`; }).join('')}</div>`;
+  }).join('');
+  const daysEl = $('#w-days');
+  daysEl.addEventListener('change', async e => {
+    const t = e.target;
+    if(t.dataset.hol){
+      if(t.checked) await dbUpsert('holidays', [{id:t.dataset.hol, date:t.dataset.hol}]);
+      else await dbDelete('holidays', [t.dataset.hol]);
+      return renderWeek(m);
+    }
+    const slotEl = t.closest('.slot'); if(!slotEl) return;
+    const key = slotEl.dataset.key, [date, slot] = key.split('|');
+    const row = {id:key, date, slot};
+    slotEl.querySelectorAll('[data-f]').forEach(i => row[i.dataset.f] = i.dataset.f === 'budget' ? (num(i.value) ?? '') : clean(i.value));
+    if(!row.dish1 && !row.dish2 && !row.dish3 && row.budget === ''){ if(C.planOf(date, slot)) await dbDelete('plans', [key]); }
+    else await dbUpsert('plans', [row]);
+    updateWeekComputed(start);
+  });
+  updateWeekComputed(start);
+}
+function updateWeekComputed(start){
+  const W = weekData(start);
+  $('#w-sum').innerHTML = `<div><div class="k">予定金額の合計</div><div class="v">${yen(W.planTotal)}</div></div><div><div class="k">実際の金額</div><div class="v">${yen(W.actualTotal)}</div></div><div><div class="k">差額（両方ある枠）</div><div class="v ${W.diffTotal > 0 ? 'b-over' : ''}">${W.diffTotal > 0 ? '+' : ''}${yen(W.diffTotal)}</div></div>`;
+  $('#w-chart').innerHTML = barChart(W);
+  for(const d of W.days) for(const x of d.slots){
+    const el = document.querySelector(`[data-res="${CSS.escape(d.date + '|' + x.slot)}"]`); if(!el) continue;
+    const jb = x.judge === '○' ? '<span class="badge b-ok">○ 予定どおり</span>' : x.judge === '変更' ? '<span class="badge b-chg">変更</span>' : x.judge === '未記録' ? '<span class="badge b-none">未記録</span>' : '';
+    el.innerHTML = `<span>予定 <b>${x.est == null ? '-' : yen(x.est)}</b></span><span>実際 <b>${x.act.has ? yen(x.act.cost) : '-'}</b>${x.act.has ? ` ${esc(x.act.dishes.join('・'))}` : ''}</span>${x.diff != null ? `<span class="${x.diff > 0 ? 'b-over' : ''}">差額 ${x.diff > 0 ? '+' : ''}${yen(x.diff)}</span>` : ''}${jb}`;
+    const slotEl = el.closest('.slot');
+    slotEl.querySelectorAll('[data-f^="dish"]').forEach(i => i.classList.toggle('unknown', !!clean(i.value) && !C.known(i.value)));
+  }
+}
+function barChart(W){
+  const w = 640, h = 260, L = 46, R = 10, T = 14, B = 34, iw = w - L - R, ih = h - T - B;
+  const max = Math.max(100, ...W.days.map(d => Math.max(d.g['朝'] + d.g['昼'] + d.g['晩'], d.planDay)));
+  const step = [100,200,500,1000,2000,5000,10000].find(s => max / s <= 6) || 10000, top = Math.ceil(max / step) * step;
+  const y = v => T + ih - v / top * ih, bw = iw / 7;
+  let s = `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px" font-family="Zen Kaku Gothic New,sans-serif">`;
+  for(let v = 0; v <= top; v += step) s += `<line x1="${L}" x2="${w-R}" y1="${y(v)}" y2="${y(v)}" stroke="#DAD3BE" stroke-width="1"/><text x="${L-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="#7A755F">${v.toLocaleString()}</text>`;
+  W.days.forEach((d, i) => {
+    const x = L + i * bw + bw * 0.2, bwi = bw * 0.6; let acc = 0;
+    for(const g of ['朝','昼','晩']){ const v = d.g[g]; if(v > 0){ s += `<rect x="${x}" y="${y(acc + v)}" width="${bwi}" height="${y(acc) - y(acc + v)}" fill="${GROUP_COLOR[g]}"><title>${md(d.date)} ${g} ${yen(v)}円</title></rect>`; acc += v; } }
+    if(acc > 0) s += `<text x="${x + bwi/2}" y="${y(acc) - 4}" font-size="11" text-anchor="middle" fill="#2E2B22">${yen(acc)}</text>`;
+    if(d.planDay > 0) s += `<line x1="${x - 4}" x2="${x + bwi + 4}" y1="${y(d.planDay)}" y2="${y(d.planDay)}" stroke="#2E2B22" stroke-width="3"><title>予定 ${yen(d.planDay)}円</title></line>`;
+    s += `<text x="${x + bwi/2}" y="${h - 14}" font-size="12" text-anchor="middle" fill="${C.isHoliday(d.date) ? '#B23B3B' : '#2E2B22'}">${md(d.date)}(${wd(d.date)})</text>`;
+  });
+  s += `</svg><div class="legend"><span><i style="background:${GROUP_COLOR['朝']}"></i>朝</span><span><i style="background:${GROUP_COLOR['昼']}"></i>昼</span><span><i style="background:${GROUP_COLOR['晩']}"></i>晩</span><span><i style="background:#2E2B22;height:3px;vertical-align:3px"></i>予定</span></div>`;
+  return s;
+}
+
+// ====================================================================
+// 買い物リスト
+// ====================================================================
+function renderShop(m){
+  const start = getWeekStart(), L = shoppingList(start);
+  let checks = {}; try{ checks = JSON.parse(localStorage.getItem(LS_CHECK) || '{}'); }catch(e){}
+  const ck = n => `${start}|${n}`;
+  const total = L.items.reduce((t, x) => t + (x.cost || 0), 0), noPrice = L.items.filter(x => x.cost == null).length;
+  m.innerHTML = `
+  <div class="card"><h2>買い物リスト</h2>${weekNav(start, 's-start')}
+    <div class="sub" style="margin-top:8px">週間献立の「まだ作っていない予定」から計算：必要な量 − 家の残り（目安）＝ 買う量。出かける前に冷蔵庫もひと目確認してね。</div>
+  </div>
+  ${L.unknown.length ? `<div class="card warnbox"><b>⚠ 材料がわからない料理が ${L.unknown.length} 品あります</b>（リストに入っていません）<br>${L.unknown.map(d => `<button class="btn sub small" data-rec="${esc(d)}">${esc(d)} をレシピに登録</button>`).join('')}</div>` : ''}
+  <div class="card"><h2><span>買うもの ${L.items.length} 品</span><span class="sub">参考金額 <b class="mono" style="color:var(--ink);font-size:16px">${yen(total)}</b> 円${noPrice ? `（値段不明 ${noPrice} 品を除く）` : ''}</span></h2>
+    ${L.items.length ? `<ul class="shop" id="s-list">${L.items.map(x => `<li class="${checks[ck(x.name)] ? 'done' : ''}"><input type="checkbox" data-ck="${esc(x.name)}" ${checks[ck(x.name)] ? 'checked' : ''}><div><div class="nm">${esc(x.name)}</div><div class="det">必要 ${qfmt(x.need)} − 家の残り ${qfmt(x.remain)}${x.cost != null ? ` ／ 約 ${yen(x.cost)} 円` : ' ／ 値段不明'}</div></div><div class="q">${qfmt(x.buy)} <span class="sub">${esc(x.unit)}</span></div></li>`).join('')}</ul>` : '<div class="empty">今週買い足すものはありません（予定が未入力か、家の残りで足りています）</div>'}
+  </div>`;
+  bindWeekNav(m, 's-start', () => renderShop(m));
+  m.querySelectorAll('[data-rec]').forEach(b => b.onclick = () => go('recipe', {dish:b.dataset.rec}));
+  const list = $('#s-list');
+  if(list) list.onchange = e => { const n = e.target.dataset.ck; if(!n) return; checks[ck(n)] = e.target.checked; try{ localStorage.setItem(LS_CHECK, JSON.stringify(checks)); }catch(x){} e.target.closest('li').classList.toggle('done', e.target.checked); };
+}
+
+// ====================================================================
+// グラフ（日別の円グラフ）
+// ====================================================================
+let graphDate = null;
+function renderGraph(m){
+  if(!graphDate) graphDate = today();
+  const by = {}; for(const c of C.cooks) if(c.date === graphDate) by[c.slot] = (by[c.slot] || 0) + (c.cost || 0);
+  const slices = SLOT_ORDER.filter(s => by[s] > 0).map(s => ({label:s, v:by[s], color:SLOT_COLOR[s]}));
+  const total = slices.reduce((t, x) => t + x.v, 0);
+  m.innerHTML = `<div class="card"><h2>日別の食費</h2>
+    <div class="row"><button class="btn sub small" id="g-prev">◀</button><input type="date" id="g-date" value="${graphDate}"><span>（${wd(graphDate)}）</span><button class="btn sub small" id="g-next">▶</button></div>
+    ${total > 0 ? `<div class="pie-wrap">${pieChart(slices)}<table style="max-width:300px"><tr><th>食事区分</th><th class="num">金額</th><th class="num">割合</th></tr>${slices.map(x => `<tr><td><span class="legend"><span><i style="background:${x.color}"></i>${x.label}</span></span></td><td class="num">${yen(x.v)}</td><td class="num">${Math.round(x.v / total * 100)}%</td></tr>`).join('')}<tr><th>合計</th><th class="num">${yen(total)}</th><th class="num">100%</th></tr></table></div>` : '<div class="empty">この日の記録はありません</div>'}
+  </div>`;
+  $('#g-date').onchange = e => { graphDate = e.target.value || today(); renderGraph(m); };
+  $('#g-prev').onclick = () => { graphDate = addDays(graphDate, -1); renderGraph(m); };
+  $('#g-next').onclick = () => { graphDate = addDays(graphDate, 1); renderGraph(m); };
+}
+function pieChart(slices){
+  const R = 110, cx = 130, cy = 130, total = slices.reduce((t, x) => t + x.v, 0);
+  let a = -Math.PI / 2, s = `<svg viewBox="0 0 260 260" width="260" height="260" font-family="Zen Kaku Gothic New,sans-serif">`;
+  if(slices.length === 1){ const x = slices[0]; s += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${x.color}"/><text x="${cx}" y="${cy}" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">${x.label}</text><text x="${cx}" y="${cy+18}" text-anchor="middle" font-size="13" fill="#fff">${yen(x.v)}円</text>`; }
+  else for(const x of slices){
+    const da = x.v / total * Math.PI * 2, b = a + da, large = da > Math.PI ? 1 : 0;
+    s += `<path d="M${cx},${cy} L${cx + R*Math.cos(a)},${cy + R*Math.sin(a)} A${R},${R} 0 ${large} 1 ${cx + R*Math.cos(b)},${cy + R*Math.sin(b)} Z" fill="${x.color}" stroke="#FBFAF5" stroke-width="2"/>`;
+    if(da > 0.35){ const m = a + da / 2, tx = cx + R*0.62*Math.cos(m), ty = cy + R*0.62*Math.sin(m); s += `<text x="${tx}" y="${ty}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">${x.label}</text><text x="${tx}" y="${ty+15}" text-anchor="middle" font-size="12" fill="#fff">${yen(x.v)}円</text>`; }
+    a = b;
+  }
+  return s + '</svg>';
+}
+
+// ====================================================================
+// レシピ
+// ====================================================================
+function renderRecipe(m, opt){
+  const dishes = [...C.recipe.keys()].sort((a,b) => a.localeCompare(b,'ja'));
+  m.innerHTML = `
+  <div class="card"><h2>レシピ（1回分の材料）</h2>
+    <div class="sub" style="margin-bottom:8px">初めて作る料理の材料を登録すると、予定金額と買い物リストに使われます。登録した料理は過去の記録よりレシピを優先します。量は「買い物」と同じ単位で。</div>
+    <div class="row"><label class="lb">料理名</label><input id="r-dish" list="dl-dish" placeholder="例：カレー" style="flex:1;min-width:150px" value="${esc(opt.dish || '')}"><button class="btn sub small" id="r-open">開く</button></div>
+    <div id="r-edit"></div>
+  </div>
+  <div class="card"><h2>登録済みのレシピ</h2>${dishes.length ? `<div class="chips">${dishes.map(d => `<button class="chip" data-open="${esc(d)}">${esc(d)} <span class="sub">${yen(C.recipeCost(d))}円</span></button>`).join('')}</div>` : '<div class="empty">まだありません</div>'}</div>`;
+  const open = dn => {
+    dn = clean(dn); if(!dn) return toast('料理名を入れてください', true);
+    $('#r-dish').value = dn;
+    const exist = C.recipe.get(dn), hist = C.dish.get(dn);
+    const ed = $('#r-edit');
+    ed.innerHTML = `<div class="sub" style="margin:4px 0 8px">${exist ? '登録済みのレシピを編集中' : '新しいレシピ'}${!exist && hist ? '（過去に作った記録あり）' : ''}</div>
+      <div class="ing-rows" id="r-rows"></div>
+      <div class="row"><button class="btn sub small" id="r-add">＋ 材料を追加</button>${!exist && hist ? '<button class="btn sub small" id="r-hist">前回の記録から作る</button>' : ''}</div>
+      <div class="total">1回分の目安 <span class="mono" id="r-total">0</span> 円</div>
+      <div class="row" style="justify-content:space-between">${exist ? '<button class="btn danger small" id="r-del">このレシピを削除</button>' : '<span></span>'}<button class="btn" id="r-save">保存する</button></div>`;
+    const rows = $('#r-rows');
+    const addRow = (n = '', q = '', u = '') => {
+      const d = document.createElement('div'); d.className = 'ing';
+      d.innerHTML = `<input class="f-n" list="dl-ing" placeholder="食材" value="${esc(n)}"><input type="number" step="any" inputmode="decimal" class="f-q" placeholder="量" value="${q ?? ''}"><input class="f-u" placeholder="単位" value="${esc(u)}"><span class="cost"></span><button class="x">✕</button>`;
+      rows.appendChild(d); upd(d);
+    };
+    const upd = d => {
+      const n = C.norm($('.f-n', d).value), q = num($('.f-q', d).value), p = C.priceOf(n), u = $('.f-u', d);
+      const e = C.ing.get(n);
+      if(e && e.unit){ u.value = e.unit; u.readOnly = true; u.style.background = '#EEF3F5'; } else { u.readOnly = false; u.style.background = ''; }
+      $('.cost', d).textContent = (q != null && p != null) ? yen(q * p) : (n && !e ? '新' : '');
+      let t = 0; rows.querySelectorAll('.ing').forEach(r => { const qq = num($('.f-q', r).value), pp = C.priceOf(C.norm($('.f-n', r).value)); if(qq != null && pp != null) t += qq * pp; });
+      $('#r-total').textContent = yen(t);
+    };
+    if(exist) exist.forEach(r => addRow(r.ingredient, r.qty, r.unit)); else for(let i = 0; i < 3; i++) addRow();
+    rows.addEventListener('input', e => { const d = e.target.closest('.ing'); if(d) upd(d); });
+    rows.addEventListener('click', e => { if(e.target.classList.contains('x')){ e.target.closest('.ing').remove(); if(!rows.children.length) addRow(); } });
+    $('#r-add').onclick = () => addRow();
+    if($('#r-hist')) $('#r-hist').onclick = () => { rows.innerHTML = ''; for(const [n, q] of hist.lastInst.ings) addRow(n, q); };
+    $('#r-save').onclick = async () => {
+      const recs = [], errs = [];
+      rows.querySelectorAll('.ing').forEach((r, i) => {
+        const n = clean($('.f-n', r).value), q = num($('.f-q', r).value), u = clean($('.f-u', r).value);
+        if(!n && q == null) return;
+        if(!n || q == null) errs.push(`${i+1}行目`);
+        else if(!C.ing.has(C.norm(n)) && !u) errs.push(`${n}の単位（初めての食材）`);
+        else recs.push({id:uid('r'), dish:dn, ingredient:n, qty:q, unit:u});
+      });
+      if(errs.length) return toast('入力を確認：' + errs.join('、'), true);
+      if(!recs.length) return toast('材料を1つ以上入れてください', true);
+      const ok = await dbReplaceDish(dn, recs);
+      if(ok) toast(`「${dn}」のレシピを保存しました`);
+      renderRecipe(m, {dish:dn});
+    };
+    if($('#r-del')) $('#r-del').onclick = async () => { if(!confirm(`「${dn}」のレシピを削除しますか？`)) return; await dbReplaceDish(dn, []); toast('削除しました'); renderRecipe(m, {}); };
+  };
+  $('#r-open').onclick = () => open($('#r-dish').value);
+  $('#r-dish').onkeydown = e => { if(e.key === 'Enter') open(e.target.value); };
+  m.querySelectorAll('[data-open]').forEach(b => b.onclick = () => open(b.dataset.open));
+  if(opt.dish) open(opt.dish);
+}
+
+// ====================================================================
+// 設定
+// ====================================================================
+function renderSettings(m){
+  m.innerHTML = `
+  <div class="card"><h2>スプレッドシート連携</h2>
+    <div class="sub" style="margin-bottom:8px">Google Apps Script の「ウェブアプリURL」を貼り付けて接続します。未接続のあいだは、この端末のブラウザにだけ保存されます。</div>
+    <div class="row"><input id="st-url" style="flex:1;min-width:200px" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(sheetUrl)}">
+    ${sheetUrl ? '<button class="btn sub" id="st-off">連携を解除</button>' : '<button class="btn" id="st-on">接続する</button>'}</div>
+  </div>
+  <div class="card"><h2>表記ゆれ辞書</h2>
+    <div class="sub" style="margin-bottom:8px">買い物で左の名前が入力されたら、右の名前として集計します（例：卵 → たまご）。</div>
+    <div class="row"><input id="al-a" placeholder="入力された名前" style="width:140px"> → <input id="al-n" list="dl-ing" placeholder="集計する名前" style="width:140px"><button class="btn small" id="al-add">追加</button></div>
+    ${state.aliases.length ? `<table>${[...state.aliases].sort((a,b) => clean(a.name).localeCompare(clean(b.name),'ja')).map(a => `<tr><td>${esc(a.alias)}</td><td>→ ${esc(a.name)}</td><td style="width:30px"><button class="x" data-del="${esc(a.id)}">✕</button></td></tr>`).join('')}</table>` : '<div class="empty">まだありません</div>'}
+  </div>
+  <div class="card"><h2>そのほか</h2>
+    <div class="row"><a href="../">在庫ノートを開く</a></div>
+    ${!sheetUrl ? '<div class="row"><button class="btn sub small" id="st-sample">お試し用のサンプルデータを入れる</button><button class="btn sub small" id="st-clear">この端末のデータを全部消す</button></div>' : ''}
+  </div>`;
+  if($('#st-on')) $('#st-on').onclick = async () => {
+    const url = clean($('#st-url').value);
+    if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) return toast('Apps Script のURLを貼り付けてください', true);
+    try{ const r = await fetch(`${url}?action=ping`); const j = await r.json(); if(!j.ok || j.app !== 'kondate') throw 0; }
+    catch(e){ return toast('接続できませんでした。献立ノート用のURLか確認してください', true); }
+    const local = hasLocalData() ? JSON.parse(JSON.stringify(state)) : null;
+    sheetUrl = url; try{ localStorage.setItem(LS_URL, url); }catch(e){}
+    await loadAll();
+    const remoteEmpty = TABLES.every(t => !state[t].length);
+    if(local && remoteEmpty && confirm('この端末に入っているデータを、スプレッドシートへ送りますか？')){
+      for(const t of TABLES) if(local[t].length) await post({action:'upsert', table:t, rows:local[t]});
+      await loadAll(true);
+    }
+    toast('スプレッドシートと接続しました'); render();
+  };
+  if($('#st-off')) $('#st-off').onclick = async () => { if(!confirm('連携を解除しますか？（スプレッドシートのデータは消えません）')) return; sheetUrl = ''; try{ localStorage.removeItem(LS_URL); }catch(e){} await loadAll(); render(); };
+  $('#al-add').onclick = async () => {
+    const a = clean($('#al-a').value), n = clean($('#al-n').value);
+    if(!a || !n || a === n) return toast('2つの名前を入れてください', true);
+    const ex = state.aliases.find(x => clean(x.alias) === a);
+    await dbUpsert('aliases', [{id: ex ? ex.id : uid('a'), alias:a, name:n}]); toast('辞書に追加しました'); renderSettings(m);
+  };
+  m.querySelector('.card:nth-child(2)').onclick = async e => { const b = e.target.closest('[data-del]'); if(!b) return; await dbDelete('aliases', [b.dataset.del]); renderSettings(m); };
+  if($('#st-sample')) $('#st-sample').onclick = () => { if(hasLocalData() && !confirm('今のデータにサンプルを追加します。よろしいですか？')) return; loadSample(); toast('サンプルを入れました'); go('week'); };
+  if($('#st-clear')) $('#st-clear').onclick = () => { if(!confirm('この端末のデータを全部消します。元に戻せません。よろしいですか？')) return; TABLES.forEach(t => state[t] = []); saveLocal(); recompute(); toast('消去しました'); renderSettings(m); };
+}
+function hasLocalData(){ return TABLES.some(t => state[t].length); }
+
+function loadSample(){
+  const P = (d, n, q, u, p) => ({id:uid('p'), date:d, name:n, qty:q, unit:u, price:p});
+  state.purchases.push(...[['米',5000,'g',2380],['たまご',10,'個',268],['食パン',6,'枚',158],['牛乳',1000,'ml',228],['鶏むね肉',600,'g',468],['玉ねぎ',3,'個',198],['キャベツ',1,'玉',178],['豚こま肉',300,'g',398],['味噌',750,'g',348],['豆腐',3,'個',98],['ヨーグルト',400,'g',158],['バナナ',5,'本',198],['卵',10,'個',248]].map(a => P('2026-10-31', ...a)));
+  const K = (d, s, dish, n, q) => ({id:uid('c'), date:d, slot:s, dish, ingredient:n, qty:q});
+  const d1 = '2026-11-01', d2 = '2026-11-02';
+  state.cooks.push(...[[d1,'朝','トースト','食パン',2],[d1,'朝','目玉焼き','たまご',2],[d1,'朝','牛乳','牛乳',400],[d1,'昼','親子丼','鶏むね肉',200],[d1,'昼','親子丼','たまご',3],[d1,'昼','親子丼','玉ねぎ',1],[d1,'昼','親子丼','米',300],[d1,'晩','生姜焼き','豚こま肉',300],[d1,'晩','生姜焼き','キャベツ',0.25],[d1,'晩','ごはん','米',300],[d1,'晩','味噌汁','味噌',30],[d1,'晩','味噌汁','豆腐',1],
+    [d2,'てつ朝','トースト','食パン',1],[d2,'てつ朝','牛乳','牛乳',200],[d2,'ぬん朝','ヨーグルト','ヨーグルト',100],[d2,'ぬん朝','バナナ','バナナ',1],[d2,'てつ昼','弁当','米',200],[d2,'てつ昼','弁当','鶏むね肉',150],[d2,'てつ昼','弁当','たまご',1],[d2,'ぬん昼','おにぎり','米',150],[d2,'晩','野菜炒め','鶏むね肉',250],[d2,'晩','野菜炒め','キャベツ',0.5],[d2,'晩','ごはん','米',300],[d2,'晩','味噌汁','味噌',30],[d2,'晩','味噌汁','豆腐',1]].map(a => K(...a)));
+  const R = (dish, n, q, u) => ({id:uid('r'), dish, ingredient:n, qty:q, unit:u});
+  state.recipes.push(...[['カレー','豚こま肉',300,''],['カレー','玉ねぎ',2,''],['カレー','じゃがいも',3,'個'],['カレー','にんじん',1,'本'],['カレー','カレールー',0.5,'箱'],['カレー','米',600,''],['鍋','豆腐',1,''],['鍋','白菜',0.25,'玉'],['鍋','鶏むね肉',300,''],['鍋','鍋つゆ',1,'袋'],['焼きそば','焼きそば麺',2,'袋'],['焼きそば','キャベツ',0.25,''],['焼きそば','豚こま肉',150,'']].map(a => R(...a)));
+  const PL = (d, s, a, b = '', c = '', bud = '') => ({id:`${d}|${s}`, date:d, slot:s, dish1:a, dish2:b, dish3:c, budget:bud});
+  state.plans.push(PL(d1,'朝','パンケーキ'), PL(d1,'昼','親子丼'), PL(d1,'晩','生姜焼き','味噌汁','ごはん'),
+    PL(d2,'てつ朝','トースト'), PL(d2,'ぬん朝','ヨーグルト'), PL(d2,'てつ昼','弁当'), PL(d2,'ぬん昼','おにぎり'), PL(d2,'晩','野菜炒め','味噌汁','ごはん'),
+    PL('2026-11-03','朝','トースト'), PL('2026-11-03','昼','焼きそば'), PL('2026-11-03','晩','鍋','','',800),
+    PL('2026-11-04','晩','カレー'), PL('2026-11-05','晩','カレー'), PL('2026-11-06','晩','焼き魚','味噌汁','ごはん'), PL('2026-11-07','晩','餃子','','スープ'));
+  state.holidays.push({id:'2026-11-03', date:'2026-11-03'});
+  state.aliases.push(...[['卵','たまご'],['玉子','たまご'],['タマゴ','たまご'],['鶏胸肉','鶏むね肉'],['お米','米'],['木綿豆腐','豆腐']].map(([a, n]) => ({id:uid('a'), alias:a, name:n})));
+  setWeekStart('2026-11-01');
+  saveLocal(); recompute();
+}
+
+// ====================================================================
+// 起動
+// ====================================================================
+(async function init(){
+  try{ sheetUrl = localStorage.getItem(LS_URL) || ''; }catch(e){}
+  renderTabs();
+  await loadAll();
+  render();
+  document.addEventListener('visibilitychange', async () => {
+    // 別の端末での変更を取り込む（入力途中の画面は描き直さない）
+    if(document.visibilityState === 'visible' && sheetUrl){ await loadAll(true); if(['week','shop','graph'].includes(tab) && !document.activeElement?.matches('input,select')) render(); }
+  });
+})();
+</script>
+</body>
+</html>
