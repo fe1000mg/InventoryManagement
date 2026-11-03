@@ -16,7 +16,8 @@ const TABLES = {
   recipes:   { sheet: 'レシピ',       cols: ['id', 'dish', 'ingredient', 'qty', 'unit', 'updatedAt'] },
   plans:     { sheet: '献立予定',     cols: ['id', 'date', 'slot', 'dish1', 'dish2', 'dish3', 'budget', 'updatedAt'] },
   holidays:  { sheet: '休日',         cols: ['id', 'date', 'updatedAt'] },
-  aliases:   { sheet: '表記ゆれ辞書', cols: ['id', 'alias', 'name', 'updatedAt'] }
+  aliases:   { sheet: '表記ゆれ辞書', cols: ['id', 'alias', 'name', 'updatedAt'] },
+  seedPrices:{ sheet: '初期単価',     cols: ['id', 'name', 'unit', 'price', 'updatedAt'] }
 };
 
 function doGet(e) {

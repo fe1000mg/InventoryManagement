@@ -127,7 +127,7 @@ a{color:var(--stamp);}
 // ====================================================================
 // 基本設定
 // ====================================================================
-const TABLES = ['purchases','cooks','recipes','plans','holidays','aliases'];
+const TABLES = ['purchases','cooks','recipes','plans','holidays','aliases','seedPrices'];
 const LS_URL = 'kondate-sheet-url', LS_DATA = 'kondate-data', LS_WEEK = 'kondate-week-start', LS_CHECK = 'kondate-shop-check';
 const SLOT_ORDER = ['朝','てつ朝','ぬん朝','昼','てつ昼','ぬん昼','晩'];
 const SLOT_COLOR = {'朝':'#E0A458','てつ朝':'#C98A2C','ぬん朝':'#F2C98A','昼':'#7FA86B','てつ昼':'#5E8A4C','ぬん昼':'#A9CB98','晩':'#4F7CA8'};
@@ -137,7 +137,7 @@ const TAB_DEFS = [
   ['cook','料理を記録'],['buy','買い物'],['week','週間献立'],['shop','買い物リスト'],['graph','グラフ'],['recipe','レシピ'],['settings','設定']
 ];
 
-let state = {purchases:[],cooks:[],recipes:[],plans:[],holidays:[],aliases:[]};
+let state = {purchases:[],cooks:[],recipes:[],plans:[],holidays:[],aliases:[],seedPrices:[]};
 let sheetUrl = '';
 let tab = 'cook';
 let C = null; // 計算結果のキャッシュ
@@ -230,6 +230,7 @@ function recompute(){
   const alias = new Map(state.aliases.map(a => [clean(a.alias), clean(a.name)]));
   const norm = n => { const c = clean(n); return alias.get(c) || c; };
   // 食材ごと：同じ食材の量と金額をプール → 平均単価
+  const seed = new Map(state.seedPrices.map(s => [norm(s.name), s]));
   const ing = new Map();
   for(const p of state.purchases){
     const n = norm(p.name); if(!n) continue;
@@ -238,7 +239,12 @@ function recompute(){
     e.buyQty += num(p.qty) || 0; e.buyPrice += num(p.price) || 0; e.count++;
     if(!e.unit && p.unit) e.unit = clean(p.unit);
   }
-  for(const e of ing.values()) e.price = e.buyQty > 0 ? e.buyPrice / e.buyQty : null;
+  for(const [n, s] of seed){ if(!ing.has(n)) ing.set(n, {name:n, unit:clean(s.unit), buyQty:0, buyPrice:0, count:0, used:0, usedCost:0}); }
+  // 買い物の記録があればその平均単価、なければ初期単価（設定タブ）を使う。買えば実績が優先される
+  for(const e of ing.values()){
+    if(e.buyQty > 0){ e.price = e.buyPrice / e.buyQty; e.seeded = false; }
+    else{ const s = seed.get(e.name); e.price = s ? num(s.price) : null; e.seeded = !!s; if(s && !e.unit) e.unit = clean(s.unit); }
+  }
   const priceOf = n => { const e = ing.get(n); return e ? e.price : null; };
   // 料理記録 → 費用、1回ごとの料理（日付・区分・料理名）
   const inst = new Map();
@@ -514,7 +520,7 @@ function renderBuy(m){
   $('#b-list').innerHTML = list.length ? `<table><tr><th>日付</th><th>食材</th><th class="num">数量</th><th class="num">金額</th><th></th></tr>${list.map(p => `<tr><td>${md(p.date)}</td><td>${esc(p.name)}${C.norm(p.name) !== clean(p.name) ? ` <span class="sub">→${esc(C.norm(p.name))}</span>` : ''}</td><td class="num">${qfmt(num(p.qty))} ${esc(p.unit)}</td><td class="num">${yen(num(p.price))}</td><td style="width:30px"><button class="x" data-del="${esc(p.id)}">✕</button></td></tr>`).join('')}</table>` : '<div class="empty">まだ買い物の記録がありません</div>';
   $('#b-list').onclick = async e => { const b = e.target.closest('[data-del]'); if(!b) return; if(!confirm('この買い物を削除しますか？')) return; await dbDelete('purchases', [b.dataset.del]); renderBuy(m); };
   const ings = [...C.ing.values()].sort((a,b) => a.name.localeCompare(b.name,'ja'));
-  $('#b-sum').innerHTML = ings.length ? `<table><tr><th>食材</th><th class="num">回数</th><th class="num">買った量</th><th class="num">平均単価</th><th class="num">使った量</th><th class="num">残り(目安)</th></tr>${ings.map(e => `<tr><td>${esc(e.name)}</td><td class="num">${e.count}</td><td class="num">${qfmt(e.buyQty)} ${esc(e.unit)}</td><td class="num">${e.price == null ? '-' : (Math.round(e.price*100)/100).toLocaleString('ja-JP')}</td><td class="num">${qfmt(e.used)}</td><td class="num ${e.remain < 0 ? 'b-over' : ''}">${qfmt(e.remain)}</td></tr>`).join('')}</table>` : '<div class="empty">データなし</div>';
+  $('#b-sum').innerHTML = ings.length ? `<table><tr><th>食材</th><th class="num">回数</th><th class="num">買った量</th><th class="num">平均単価</th><th class="num">使った量</th><th class="num">残り(目安)</th></tr>${ings.map(e => `<tr><td>${esc(e.name)}</td><td class="num">${e.count}</td><td class="num">${qfmt(e.buyQty)} ${esc(e.unit)}</td><td class="num">${e.price == null ? '-' : (Math.round(e.price*100)/100).toLocaleString('ja-JP')}${e.seeded ? ' <span class="sub">(初期単価)</span>' : ''}</td><td class="num">${qfmt(e.used)}</td><td class="num ${e.remain < 0 ? 'b-over' : ''}">${qfmt(e.remain)}</td></tr>`).join('')}</table>` : '<div class="empty">データなし</div>';
 }
 
 // ====================================================================
@@ -726,6 +732,11 @@ function renderSettings(m){
     <div class="row"><input id="al-a" placeholder="入力された名前" style="width:140px"> → <input id="al-n" list="dl-ing" placeholder="集計する名前" style="width:140px"><button class="btn small" id="al-add">追加</button></div>
     ${state.aliases.length ? `<table>${[...state.aliases].sort((a,b) => clean(a.name).localeCompare(clean(b.name),'ja')).map(a => `<tr><td>${esc(a.alias)}</td><td>→ ${esc(a.name)}</td><td style="width:30px"><button class="x" data-del="${esc(a.id)}">✕</button></td></tr>`).join('')}</table>` : '<div class="empty">まだありません</div>'}
   </div>
+  <div class="card"><h2>初期単価（家にあるもの）</h2>
+    <div class="sub" style="margin-bottom:8px">まだ買い物に記録していない食材でも、ここで単価を入れておけば料理の費用を計算できます。買い物に記録すると、そちらの実際の単価が自動的に優先されます（ここの値は使われなくなります）。</div>
+    <div class="row"><input id="sp-n" list="dl-ing" placeholder="食材名" style="width:140px"><input id="sp-u" placeholder="単位" style="width:70px"><input id="sp-p" type="number" step="any" placeholder="単価(円)" style="width:100px"><button class="btn small" id="sp-add">追加</button></div>
+    ${state.seedPrices.length ? `<table>${[...state.seedPrices].sort((a,b) => clean(a.name).localeCompare(clean(b.name),'ja')).map(s => `<tr><td>${esc(s.name)}</td><td class="num">${esc(s.unit)}</td><td class="num">${yen(num(s.price))}円${C.ing.get(C.norm(s.name)) && C.ing.get(C.norm(s.name)).buyQty > 0 ? ' <span class="sub">(買い物の実績を使用中)</span>' : ''}</td><td style="width:30px"><button class="x" data-delsp="${esc(s.id)}">✕</button></td></tr>`).join('')}</table>` : '<div class="empty">まだありません</div>'}
+  </div>
   <div class="card"><h2>そのほか</h2>
     <div class="row"><a href="../">在庫ノートを開く</a></div>
     ${!sheetUrl ? '<div class="row"><button class="btn sub small" id="st-sample">お試し用のサンプルデータを入れる</button><button class="btn sub small" id="st-clear">この端末のデータを全部消す</button></div>' : ''}
@@ -753,6 +764,13 @@ function renderSettings(m){
     await dbUpsert('aliases', [{id: ex ? ex.id : uid('a'), alias:a, name:n}]); toast('辞書に追加しました'); renderSettings(m);
   };
   m.querySelector('.card:nth-child(2)').onclick = async e => { const b = e.target.closest('[data-del]'); if(!b) return; await dbDelete('aliases', [b.dataset.del]); renderSettings(m); };
+  $('#sp-add').onclick = async () => {
+    const n = clean($('#sp-n').value), u = clean($('#sp-u').value), p = num($('#sp-p').value);
+    if(!n || p == null) return toast('食材名と単価を入れてください', true);
+    const ex = state.seedPrices.find(x => clean(x.name) === n);
+    await dbUpsert('seedPrices', [{id: ex ? ex.id : uid('s'), name:n, unit:u, price:p}]); toast('初期単価を保存しました'); renderSettings(m);
+  };
+  $('#sp-n').closest('.card').addEventListener('click', async e => { const b = e.target.closest('[data-delsp]'); if(!b) return; await dbDelete('seedPrices', [b.dataset.delsp]); renderSettings(m); });
   if($('#st-sample')) $('#st-sample').onclick = () => { if(hasLocalData() && !confirm('今のデータにサンプルを追加します。よろしいですか？')) return; loadSample(); toast('サンプルを入れました'); go('week'); };
   if($('#st-clear')) $('#st-clear').onclick = () => { if(!confirm('この端末のデータを全部消します。元に戻せません。よろしいですか？')) return; TABLES.forEach(t => state[t] = []); saveLocal(); recompute(); toast('消去しました'); renderSettings(m); };
 }
