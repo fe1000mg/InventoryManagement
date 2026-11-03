@@ -261,7 +261,7 @@ function recompute(){
     x.cost += c.cost || 0;
     x.ings.set(c.ingredient, (x.ings.get(c.ingredient) || 0) + (c.q || 0));
   });
-  for(const e of ing.values()) e.remain = e.buyQty - e.used;
+  for(const e of ing.values()){ const s = seed.get(e.name); e.remain = e.buyQty - e.used + (s ? (num(s.stock) || 0) : 0); }
   // 料理ごとの統計
   const dish = new Map();
   for(const x of inst.values()){
@@ -732,10 +732,10 @@ function renderSettings(m){
     <div class="row"><input id="al-a" placeholder="入力された名前" style="width:140px"> → <input id="al-n" list="dl-ing" placeholder="集計する名前" style="width:140px"><button class="btn small" id="al-add">追加</button></div>
     ${state.aliases.length ? `<table>${[...state.aliases].sort((a,b) => clean(a.name).localeCompare(clean(b.name),'ja')).map(a => `<tr><td>${esc(a.alias)}</td><td>→ ${esc(a.name)}</td><td style="width:30px"><button class="x" data-del="${esc(a.id)}">✕</button></td></tr>`).join('')}</table>` : '<div class="empty">まだありません</div>'}
   </div>
-  <div class="card"><h2>初期単価（家にあるもの）</h2>
-    <div class="sub" style="margin-bottom:8px">まだ買い物に記録していない食材でも、ここで単価を入れておけば料理の費用を計算できます。買い物に記録すると、そちらの実際の単価が自動的に優先されます（ここの値は使われなくなります）。</div>
-    <div class="row"><input id="sp-n" list="dl-ing" placeholder="食材名" style="width:140px"><input id="sp-u" placeholder="単位" style="width:70px"><input id="sp-p" type="number" step="any" placeholder="単価(円)" style="width:100px"><button class="btn small" id="sp-add">追加</button></div>
-    ${state.seedPrices.length ? `<table>${[...state.seedPrices].sort((a,b) => clean(a.name).localeCompare(clean(b.name),'ja')).map(s => `<tr><td>${esc(s.name)}</td><td class="num">${esc(s.unit)}</td><td class="num">${yen(num(s.price))}円${C.ing.get(C.norm(s.name)) && C.ing.get(C.norm(s.name)).buyQty > 0 ? ' <span class="sub">(買い物の実績を使用中)</span>' : ''}</td><td style="width:30px"><button class="x" data-delsp="${esc(s.id)}">✕</button></td></tr>`).join('')}</table>` : '<div class="empty">まだありません</div>'}
+  <div class="card"><h2>食材の登録（在庫・単価・棚卸）</h2>
+    <div class="sub" style="margin-bottom:8px">まだ買い物に記録していない食材でも、ここで登録すれば「料理を記録」で選べるようになります。単価を入れておけば費用も計算されます（買い物の記録ができたら、そちらの実際の単価が自動的に優先されます）。「今ある量」は棚卸のように使えます：家にある分を入れておくと残り・買い物リストの計算に反映され、ずれてきたら数字を書き換えるだけで直せます。</div>
+    <div class="row"><input id="sp-n" list="dl-ing" placeholder="食材名" style="width:140px"><input id="sp-u" placeholder="単位" style="width:70px"><input id="sp-p" type="number" step="any" placeholder="単価(円・任意)" style="width:110px"><input id="sp-s" type="number" step="any" placeholder="今ある量(任意)" style="width:110px"><button class="btn small" id="sp-add">追加</button></div>
+    ${state.seedPrices.length ? `<table><tr><th>食材</th><th class="num">単位</th><th class="num">単価</th><th class="num">今ある量</th><th></th></tr>${[...state.seedPrices].sort((a,b) => clean(a.name).localeCompare(clean(b.name),'ja')).map(s => `<tr><td>${esc(s.name)}</td><td class="num">${esc(s.unit)}</td><td class="num">${s.price === '' || s.price == null ? '-' : yen(num(s.price)) + '円'}${C.ing.get(C.norm(s.name)) && C.ing.get(C.norm(s.name)).buyQty > 0 ? ' <span class="sub">(買い物の実績を使用中)</span>' : ''}</td><td class="num">${s.stock === '' || s.stock == null ? '-' : qfmt(num(s.stock))}</td><td style="width:30px"><button class="x" data-delsp="${esc(s.id)}">✕</button></td></tr>`).join('')}</table>` : '<div class="empty">まだありません</div>'}
   </div>
   <div class="card"><h2>そのほか</h2>
     <div class="row"><a href="../">在庫ノートを開く</a></div>
@@ -765,10 +765,10 @@ function renderSettings(m){
   };
   m.querySelector('.card:nth-child(2)').onclick = async e => { const b = e.target.closest('[data-del]'); if(!b) return; await dbDelete('aliases', [b.dataset.del]); renderSettings(m); };
   $('#sp-add').onclick = async () => {
-    const n = clean($('#sp-n').value), u = clean($('#sp-u').value), p = num($('#sp-p').value);
-    if(!n || p == null) return toast('食材名と単価を入れてください', true);
+    const n = clean($('#sp-n').value), u = clean($('#sp-u').value), p = num($('#sp-p').value), s = num($('#sp-s').value);
+    if(!n) return toast('食材名を入れてください', true);
     const ex = state.seedPrices.find(x => clean(x.name) === n);
-    await dbUpsert('seedPrices', [{id: ex ? ex.id : uid('s'), name:n, unit:u, price:p}]); toast('初期単価を保存しました'); renderSettings(m);
+    await dbUpsert('seedPrices', [{id: ex ? ex.id : uid('s'), name:n, unit:u, price: p == null ? '' : p, stock: s == null ? '' : s}]); toast('登録しました'); renderSettings(m);
   };
   $('#sp-n').closest('.card').addEventListener('click', async e => { const b = e.target.closest('[data-delsp]'); if(!b) return; await dbDelete('seedPrices', [b.dataset.delsp]); renderSettings(m); });
   if($('#st-sample')) $('#st-sample').onclick = () => { if(hasLocalData() && !confirm('今のデータにサンプルを追加します。よろしいですか？')) return; loadSample(); toast('サンプルを入れました'); go('week'); };
